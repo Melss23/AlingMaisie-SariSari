@@ -158,49 +158,67 @@ function loadProduct(){
 barcode.addEventListener("input", loadProduct);
 
 // SCANNER
-let codeReader;
-let selectedDeviceId;
+let stream;
 
-// START SCAN
+// START CAMERA
 async function startScan(){
-  codeReader = new ZXing.BrowserBarcodeReader();
-
   try {
-    const devices = await ZXing.BrowserCodeReader.listVideoInputDevices();
 
-    if(devices.length === 0){
-      alert("No camera found");
-      return;
-    }
+    const video = document.getElementById("video");
 
-    // Use back camera
-    selectedDeviceId = devices[devices.length - 1].deviceId;
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment" }
+    });
 
-    codeReader.decodeFromVideoDevice(
-      selectedDeviceId,
-      'video',
-      (result, err) => {
-        if(result){
-          console.log("SCANNED:", result.text);
+    video.srcObject = stream;
 
-          barcode.value = result.text;
-          loadProduct();
+    video.onloadedmetadata = () => {
+      video.play();
+    };
 
-          stopScan(); // auto stop after scan
-        }
-      }
-    );
+    startBarcodeDetection();
 
   } catch(err){
-    alert("Camera error: " + err);
+    alert("Camera error: " + err.message);
+    console.error(err);
   }
 }
 
-// STOP SCAN
+// STOP CAMERA
 function stopScan(){
-  if(codeReader){
-    codeReader.reset();
+  if(stream){
+    stream.getTracks().forEach(track => track.stop());
   }
+}
+
+// SIMPLE BARCODE DETECTION (fallback)
+async function startBarcodeDetection(){
+
+  if (!('BarcodeDetector' in window)) {
+    alert("BarcodeDetector not supported on this device.\nUse Chrome Android.");
+    return;
+  }
+
+  const detector = new BarcodeDetector({
+    formats: ['ean_13','upc_a','code_128']
+  });
+
+  const video = document.getElementById("video");
+
+  setInterval(async () => {
+    try {
+      const barcodes = await detector.detect(video);
+
+      if(barcodes.length > 0){
+        barcode.value = barcodes[0].rawValue;
+        loadProduct();
+        stopScan();
+      }
+
+    } catch(err){
+      console.error(err);
+    }
+  }, 500);
 }
 // BUY
 async function buy(){
