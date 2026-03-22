@@ -56,7 +56,9 @@
       <input id="barcode" placeholder="Enter barcode">
       <button onclick="scan()">📷 Scan</button>
 
-      <video id="video" style="width:100%"></video>
+     <video id="video" style="width:100%; border-radius:10px;"></video>
+<button onclick="startScan()">📷 Start Scan</button>
+<button onclick="stopScan()">⛔ Stop</button>
 
       <div id="pname">Product: -</div>
       <div id="pprice">Price: -</div>
@@ -156,20 +158,48 @@ function loadProduct(){
 barcode.addEventListener("input", loadProduct);
 
 // SCANNER
-async function scan(){
+let codeReader;
+let selectedDeviceId;
 
-  const codeReader = new ZXing.BrowserBarcodeReader();
-  const videoElement = document.getElementById('video');
+// START SCAN
+async function startScan(){
+  codeReader = new ZXing.BrowserBarcodeReader();
 
   try {
-    const result = await codeReader.decodeOnceFromVideoDevice(undefined, videoElement);
+    const devices = await ZXing.BrowserCodeReader.listVideoInputDevices();
 
-    barcode.value = result.text;
+    if(devices.length === 0){
+      alert("No camera found");
+      return;
+    }
 
-    loadProduct();
+    // Use back camera
+    selectedDeviceId = devices[devices.length - 1].deviceId;
 
-  } catch (err) {
-    alert("Scan failed: " + err);
+    codeReader.decodeFromVideoDevice(
+      selectedDeviceId,
+      'video',
+      (result, err) => {
+        if(result){
+          console.log("SCANNED:", result.text);
+
+          barcode.value = result.text;
+          loadProduct();
+
+          stopScan(); // auto stop after scan
+        }
+      }
+    );
+
+  } catch(err){
+    alert("Camera error: " + err);
+  }
+}
+
+// STOP SCAN
+function stopScan(){
+  if(codeReader){
+    codeReader.reset();
   }
 }
 // BUY
