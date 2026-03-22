@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-  <script src="https://unpkg.com/html5-qrcode"></script>
+  <script src="https://unpkg.com/@zxing/browser@latest"></script>
 
   <style>
     body { font-family: Arial; margin:0; background:#f4f6f9; }
@@ -56,7 +56,7 @@
       <input id="barcode" placeholder="Enter barcode">
       <button onclick="scan()">📷 Scan</button>
 
-      <div id="reader"></div>
+      <video id="video" style="width:100%"></video>
 
       <div id="pname">Product: -</div>
       <div id="pprice">Price: -</div>
@@ -158,38 +158,20 @@ barcode.addEventListener("input", loadProduct);
 // SCANNER
 async function scan(){
 
-  document.getElementById("reader").innerHTML = "";
-
-  const qr = new Html5Qrcode("reader");
+  const codeReader = new ZXing.BrowserBarcodeReader();
+  const videoElement = document.getElementById('video');
 
   try {
-    await qr.start(
-      { facingMode: "environment" },
-      {
-        fps: 10,
-        qrbox: { width: 250, height: 150 },
+    const result = await codeReader.decodeOnceFromVideoDevice(undefined, videoElement);
 
-        // 🔥 IMPORTANT: ENABLE BARCODES
-        formatsToSupport: [
-          Html5QrcodeSupportedFormats.EAN_13,
-          Html5QrcodeSupportedFormats.EAN_8,
-          Html5QrcodeSupportedFormats.CODE_128,
-          Html5QrcodeSupportedFormats.CODE_39,
-          Html5QrcodeSupportedFormats.UPC_A,
-          Html5QrcodeSupportedFormats.UPC_E
-        ]
-      },
-      (decodedText) => {
-        barcode.value = decodedText;
-        qr.stop();
-        loadProduct();
-      }
-    );
-  } catch (err){
-    alert("Scanner error: " + err);
+    barcode.value = result.text;
+
+    loadProduct();
+
+  } catch (err) {
+    alert("Scan failed: " + err);
   }
 }
-
 // BUY
 async function buy(){
   let code = barcode.value.trim();
