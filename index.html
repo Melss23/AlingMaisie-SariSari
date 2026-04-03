@@ -4,7 +4,11 @@
   <title>Sari-Sari POS</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
+  <!-- Excel Export -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+  <!-- 🔥 SCANNER (ZXING - ANDROID + IOS) -->
+  <script src="https://unpkg.com/@zxing/browser@latest"></script>
 
   <style>
     body { font-family: Arial; margin:0; background:#f4f6f9; }
@@ -15,6 +19,7 @@
     .card { background:white; padding:20px; border-radius:10px; margin-bottom:20px; }
     input,button { width:100%; padding:10px; margin-top:10px; }
     .hidden { display:none; }
+    video { width:100%; border-radius:10px; margin-top:10px; }
   </style>
 </head>
 
@@ -54,11 +59,10 @@
 
       <input id="barcode" placeholder="Scan or enter barcode">
 
-      <!-- 🔥 SCAN BUTTON -->
       <button onclick="startScan()">📷 Scan Barcode</button>
+      <button onclick="stopScan()">⛔ Stop</button>
 
-      <!-- CAMERA -->
-      <video id="video" autoplay playsinline style="width:100%; margin-top:10px; border-radius:10px;"></video>
+      <video id="video" autoplay playsinline></video>
 
       <div id="pname">Product: -</div>
       <div id="pprice">Price: -</div>
@@ -105,7 +109,7 @@ async function login(){
   await load();
 }
 
-// NAV
+// NAVIGATION
 function show(id){
   document.querySelectorAll(".card").forEach(c=>c.classList.add("hidden"));
   document.getElementById(id).classList.remove("hidden");
@@ -178,7 +182,7 @@ async function buy(){
   load();
 }
 
-// EXPORT
+// EXPORT EXCEL
 function exportExcel(){
   let formatted = sales.slice(1).map(s => ({
     Date: s[0],
@@ -210,24 +214,38 @@ function topSelling(){
 }
 
 //////////////////////////////////////////////////
-// 🔥 SCANNER (ANDROID ONLY)
+// 🔥 SCANNER (ANDROID + IOS)
 //////////////////////////////////////////////////
 
-let stream;
-let scanning = false;
+let codeReader = null;
 
 async function startScan(){
   try {
-    const video = document.getElementById("video");
 
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "environment" }
+    codeReader = new ZXing.BrowserMultiFormatReader();
+
+    const devices = await ZXing.BrowserCodeReader.listVideoInputDevices();
+
+    if(devices.length === 0){
+      alert("No camera found");
+      return;
+    }
+
+    const selectedDeviceId = devices[devices.length - 1].deviceId;
+
+    codeReader.decodeFromVideoDevice(selectedDeviceId, 'video', (result, err) => {
+
+      if(result){
+        const code = result.text;
+
+        // 🔥 MAIN LOGIC
+        barcode.value = code;
+        barcode.dispatchEvent(new Event('input'));
+
+        stopScan();
+      }
+
     });
-
-    video.srcObject = stream;
-    scanning = true;
-
-    detectBarcode();
 
   } catch(err){
     alert("Camera error: " + err.message);
@@ -235,45 +253,8 @@ async function startScan(){
 }
 
 function stopScan(){
-  scanning = false;
-
-  if(stream){
-    stream.getTracks().forEach(track => track.stop());
-  }
-}
-
-async function detectBarcode(){
-
-  if (!('BarcodeDetector' in window)) {
-    alert("Scanner not supported. Use Android Chrome.");
-    return;
-  }
-
-  const detector = new BarcodeDetector({
-    formats: ['ean_13','upc_a','code_128']
-  });
-
-  const video = document.getElementById("video");
-
-  while(scanning){
-    try {
-      const barcodes = await detector.detect(video);
-
-      if(barcodes.length > 0){
-        const code = barcodes[0].rawValue;
-
-        barcode.value = code;
-        barcode.dispatchEvent(new Event('input'));
-
-        stopScan();
-        break;
-      }
-
-    } catch(err){
-      console.log(err);
-    }
-
-    await new Promise(r => setTimeout(r, 500));
+  if(codeReader){
+    codeReader.reset();
   }
 }
 
