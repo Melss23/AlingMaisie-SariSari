@@ -43,13 +43,22 @@
 
   <div class="container">
 
+    <!-- HOME -->
     <div id="home" class="card">
       <h2>Welcome</h2>
-      <p>📢 Your store is ready</p>
+      <p>📢 System Ready</p>
     </div>
 
+    <!-- POS -->
     <div id="pos" class="card hidden">
+
       <input id="barcode" placeholder="Scan or enter barcode">
+
+      <!-- 🔥 SCAN BUTTON -->
+      <button onclick="startScan()">📷 Scan Barcode</button>
+
+      <!-- CAMERA -->
+      <video id="video" autoplay playsinline style="width:100%; margin-top:10px; border-radius:10px;"></video>
 
       <div id="pname">Product: -</div>
       <div id="pprice">Price: -</div>
@@ -58,8 +67,10 @@
       <input id="qty" type="number" value="1">
 
       <button onclick="buy()">Buy</button>
+
     </div>
 
+    <!-- ADMIN -->
     <div id="admin" class="card hidden">
       <button onclick="load()">Refresh</button>
       <button onclick="exportExcel()">Export Excel</button>
@@ -71,7 +82,8 @@
 </div>
 
 <script>
-let URL = "YOUR_WEB_APP_URL";
+
+let URL = "https://script.google.com/macros/s/AKfycby6lyDIk9Gtdgk3hyIrDeWF3a5-PUdGw_UE98a2vFplhj6ln1RFY45gJYRVghCpQU0C/exec";
 
 let products = {};
 let sales = [];
@@ -125,6 +137,10 @@ barcode.addEventListener("input", ()=>{
     pname.innerText = "Product: " + p.name;
     pprice.innerText = "Price: ₱" + p.srp;
     pstock.innerText = p.stock;
+  } else {
+    pname.innerText = "Product: NOT FOUND";
+    pprice.innerText = "-";
+    pstock.innerText = "-";
   }
 });
 
@@ -192,6 +208,75 @@ function topSelling(){
     .map(i=>i[0]+" - "+i[1]+" pcs")
     .join("<br>");
 }
+
+//////////////////////////////////////////////////
+// 🔥 SCANNER (ANDROID ONLY)
+//////////////////////////////////////////////////
+
+let stream;
+let scanning = false;
+
+async function startScan(){
+  try {
+    const video = document.getElementById("video");
+
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment" }
+    });
+
+    video.srcObject = stream;
+    scanning = true;
+
+    detectBarcode();
+
+  } catch(err){
+    alert("Camera error: " + err.message);
+  }
+}
+
+function stopScan(){
+  scanning = false;
+
+  if(stream){
+    stream.getTracks().forEach(track => track.stop());
+  }
+}
+
+async function detectBarcode(){
+
+  if (!('BarcodeDetector' in window)) {
+    alert("Scanner not supported. Use Android Chrome.");
+    return;
+  }
+
+  const detector = new BarcodeDetector({
+    formats: ['ean_13','upc_a','code_128']
+  });
+
+  const video = document.getElementById("video");
+
+  while(scanning){
+    try {
+      const barcodes = await detector.detect(video);
+
+      if(barcodes.length > 0){
+        const code = barcodes[0].rawValue;
+
+        barcode.value = code;
+        barcode.dispatchEvent(new Event('input'));
+
+        stopScan();
+        break;
+      }
+
+    } catch(err){
+      console.log(err);
+    }
+
+    await new Promise(r => setTimeout(r, 500));
+  }
+}
+
 </script>
 
 </body>
