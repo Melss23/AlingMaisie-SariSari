@@ -1,11 +1,10 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Aling Maisie Sari-Sari Store</title>
+  <title>Sari-Sari POS</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-  <script src="https://unpkg.com/@zxing/browser@latest"></script>
 
   <style>
     body { font-family: Arial; margin:0; background:#f4f6f9; }
@@ -16,13 +15,12 @@
     .card { background:white; padding:20px; border-radius:10px; margin-bottom:20px; }
     input,button { width:100%; padding:10px; margin-top:10px; }
     .hidden { display:none; }
-    .ads { text-align:center; padding:30px; background:#fff3cd; }
   </style>
 </head>
 
 <body>
 
-<div class="header">🛒 Aling Maisie Sari-Sari Store</div>
+<div class="header">🛒 Sari-Sari POS</div>
 
 <!-- LOGIN -->
 <div id="loginPage" class="container">
@@ -30,7 +28,7 @@
     <h3>Login</h3>
     <input id="user" placeholder="Username">
     <input id="pass" type="password" placeholder="Password">
-    <button onclick="handleLogin()">Login</button>
+    <button onclick="login()">Login</button>
   </div>
 </div>
 
@@ -38,27 +36,20 @@
 <div id="app" class="hidden">
 
   <div class="nav">
-    <button onclick="showPage('home')">🏠 Home</button>
-    <button onclick="showPage('pos')">💳 Transaction</button>
-    <button onclick="showPage('admin')" id="adminBtn">📊 Admin</button>
+    <button onclick="show('home')">Home</button>
+    <button onclick="show('pos')">Transaction</button>
+    <button onclick="show('admin')" id="adminBtn">Admin</button>
   </div>
 
   <div class="container">
 
-    <!-- HOME -->
     <div id="home" class="card">
       <h2>Welcome</h2>
-      <div class="ads">📢 PROMO: Buy 2 Get 1 Free!</div>
+      <p>📢 Your store is ready</p>
     </div>
 
-    <!-- POS -->
     <div id="pos" class="card hidden">
-      <input id="barcode" placeholder="Enter barcode">
-      <button onclick="scan()">📷 Scan</button>
-
-     <video id="video" autoplay playsinline muted style="width:100%; border-radius:10px;"></video>
-<button onclick="startScan()">📷 Start Scan</button>
-<button onclick="stopScan()">⛔ Stop</button>
+      <input id="barcode" placeholder="Scan or enter barcode">
 
       <div id="pname">Product: -</div>
       <div id="pprice">Price: -</div>
@@ -69,7 +60,6 @@
       <button onclick="buy()">Buy</button>
     </div>
 
-    <!-- ADMIN -->
     <div id="admin" class="card hidden">
       <button onclick="load()">Refresh</button>
       <button onclick="exportExcel()">Export Excel</button>
@@ -81,13 +71,13 @@
 </div>
 
 <script>
-let URL = "https://script.google.com/macros/s/AKfycby6lyDIk9Gtdgk3hyIrDeWF3a5-PUdGw_UE98a2vFplhj6ln1RFY45gJYRVghCpQU0C/exec";
+let URL = "YOUR_WEB_APP_URL";
 
 let products = {};
 let sales = [];
 
 // LOGIN
-async function handleLogin(){
+async function login(){
   if(user.value==="admin" && pass.value==="1234"){
     adminBtn.style.display="block";
   } else if(user.value==="cashier" && pass.value==="1234"){
@@ -103,123 +93,41 @@ async function handleLogin(){
   await load();
 }
 
-// NAVIGATION
-function showPage(page){
+// NAV
+function show(id){
   document.querySelectorAll(".card").forEach(c=>c.classList.add("hidden"));
-  document.getElementById(page).classList.remove("hidden");
+  document.getElementById(id).classList.remove("hidden");
 }
 
 // LOAD DATA
 async function load(){
-  try {
-    let res = await fetch(URL);
-    let data = await res.json();
+  let res = await fetch(URL);
+  let data = await res.json();
 
-    console.log("DATA:", data);
+  products = {};
+  data.products.slice(1).forEach(r=>{
+    products[String(r[0]).trim()] = {
+      name:r[1],
+      srp:Number(r[2]),
+      margin:Number(r[3]),
+      stock:Number(r[4])
+    };
+  });
 
-    products = {};
-    data.products.slice(1).forEach(r=>{
-      products[String(r[0]).trim()] = {
-        name:r[1],
-        srp:Number(r[2]),
-        margin:Number(r[3]),
-        stock:Number(r[4])
-      };
-    });
-
-    sales = data.sales;
-
-    console.log("PRODUCTS:", products);
-    console.log("SALES:", sales);
-
-  } catch(err){
-    alert("Error loading data");
-    console.error(err);
-  }
+  sales = data.sales;
 }
 
-// LOAD PRODUCT
-function loadProduct(){
-  let code = barcode.value.trim();
-  let p = products[code];
+// AUTO LOAD PRODUCT
+barcode.addEventListener("input", ()=>{
+  let p = products[barcode.value.trim()];
 
   if(p){
     pname.innerText = "Product: " + p.name;
     pprice.innerText = "Price: ₱" + p.srp;
     pstock.innerText = p.stock;
-  } else {
-    pname.innerText = "Product: NOT FOUND";
-    pprice.innerText = "-";
-    pstock.innerText = "-";
   }
-}
+});
 
-// AUTO LOAD ON INPUT
-barcode.addEventListener("input", loadProduct);
-
-// SCANNER
-let stream;
-
-// START CAMERA
-async function startScan(){
-  try {
-
-    const video = document.getElementById("video");
-
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "environment" }
-    });
-
-    video.srcObject = stream;
-
-    video.onloadedmetadata = () => {
-      video.play();
-    };
-
-    startBarcodeDetection();
-
-  } catch(err){
-    alert("Camera error: " + err.message);
-    console.error(err);
-  }
-}
-
-// STOP CAMERA
-function stopScan(){
-  if(stream){
-    stream.getTracks().forEach(track => track.stop());
-  }
-}
-
-// SIMPLE BARCODE DETECTION (fallback)
-async function startBarcodeDetection(){
-
-  if (!('BarcodeDetector' in window)) {
-    alert("BarcodeDetector not supported on this device.\nUse Chrome Android.");
-    return;
-  }
-
-  const detector = new BarcodeDetector({
-    formats: ['ean_13','upc_a','code_128']
-  });
-
-  const video = document.getElementById("video");
-
-  setInterval(async () => {
-    try {
-      const barcodes = await detector.detect(video);
-
-      if(barcodes.length > 0){
-        barcode.value = barcodes[0].rawValue;
-        loadProduct();
-        stopScan();
-      }
-
-    } catch(err){
-      console.error(err);
-    }
-  }, 500);
-}
 // BUY
 async function buy(){
   let code = barcode.value.trim();
@@ -239,35 +147,23 @@ async function buy(){
   let total = p.srp * q;
   let profit = p.margin * q;
 
-  let payload = {
-    barcode: code,
-    name: p.name,
-    qty:q,
-    total:total,
-    profit:profit
-  };
-
-  console.log("SENDING:", payload);
-
   let res = await fetch(URL,{
     method:"POST",
-    body: JSON.stringify(payload)
+    body: JSON.stringify({
+      barcode: code,
+      name: p.name,
+      qty:q,
+      total:total,
+      profit:profit
+    })
   });
 
-  let msg = await res.text();
-  alert(msg);
-
-  await load();
+  alert(await res.text());
+  load();
 }
 
-// EXPORT EXCEL
+// EXPORT
 function exportExcel(){
-
-  if(!sales || sales.length <= 1){
-    alert("No data");
-    return;
-  }
-
   let formatted = sales.slice(1).map(s => ({
     Date: s[0],
     Product: s[1],
@@ -278,8 +174,8 @@ function exportExcel(){
 
   let ws = XLSX.utils.json_to_sheet(formatted);
   let wb = XLSX.utils.book_new();
-
   XLSX.utils.book_append_sheet(wb, ws, "Sales");
+
   XLSX.writeFile(wb, "sales.xlsx");
 }
 
