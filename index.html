@@ -186,7 +186,6 @@
       <div id="pos" class="card page-section hidden">
         <h2>Transaction</h2>
 
-        <!-- SCANNER MOVED TO TOP -->
         <div id="scannerWrap">
           <video id="scannerPreview" autoplay muted playsinline></video>
           <div class="scan-guide"></div>
@@ -247,7 +246,7 @@
     let scannerRunning = false;
     let lastScannedCode = "";
     let lastScannedAt = 0;
-    const SCAN_COOLDOWN_MS = 1200;
+    const SCAN_COOLDOWN_MS = 350;
 
     //////////////////////////////////////////////////
     // DOM
@@ -447,7 +446,6 @@
     function createHints() {
       const hints = new Map();
 
-      // Keep only the most common retail formats for faster reading
       hints.set(DecodeHintType.POSSIBLE_FORMATS, [
         BarcodeFormat.EAN_13,
         BarcodeFormat.UPC_A,
@@ -477,9 +475,32 @@
       const clean = String(text || "").trim();
       if (!clean) return;
 
-      barcode.value = clean;
+      const currentBarcode = barcode.value.trim();
+      const currentQty = parseInt(qty.value, 10) || 1;
+
+      if (currentBarcode === clean) {
+        qty.value = currentQty + 1;
+      } else {
+        barcode.value = clean;
+        qty.value = 1;
+      }
+
       barcode.dispatchEvent(new Event("input", { bubbles: true }));
-      scanStatus.innerText = "Scanned: " + clean;
+
+      const p = products[clean];
+      if (p) {
+        const wantedQty = parseInt(qty.value, 10) || 1;
+
+        if (wantedQty > p.stock) {
+          qty.value = p.stock > 0 ? p.stock : 1;
+          scanStatus.innerText = "Max stock reached for " + clean;
+        } else {
+          scanStatus.innerText = "Scanned: " + clean + " | Qty: " + qty.value;
+        }
+      } else {
+        scanStatus.innerText = "Scanned: " + clean;
+      }
+
       barcode.focus();
     }
 
@@ -491,7 +512,6 @@
       if (!track) return;
 
       const capabilities = track.getCapabilities ? track.getCapabilities() : {};
-
       const advanced = [];
 
       if (capabilities.focusMode && capabilities.focusMode.includes("continuous")) {
@@ -507,9 +527,7 @@
       }
 
       try {
-        await track.applyConstraints({
-          advanced
-        });
+        await track.applyConstraints({ advanced });
       } catch (e) {
         console.log("Constraint tuning skipped:", e);
       }
@@ -528,8 +546,8 @@
 
         const hints = createHints();
         codeReader = new BrowserMultiFormatReader(hints, {
-          delayBetweenScanAttempts: 30,
-          delayBetweenScanSuccess: 500
+          delayBetweenScanAttempts: 10,
+          delayBetweenScanSuccess: 80
         });
 
         const deviceId = await getBestDeviceId();
@@ -559,7 +577,6 @@
                 lastScannedCode = text;
                 lastScannedAt = now;
                 fillBarcodeField(text);
-                await stopScan();
               }
               return;
             }
