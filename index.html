@@ -240,8 +240,6 @@ function topSelling(){
 // ✅ NEW SCANNER (html5-qrcode)
 //////////////////////////////////////////////////
 
-let html5QrCode = null;
-
 async function startScan(){
 
   try {
@@ -260,7 +258,25 @@ async function startScan(){
       return;
     }
 
-    const cameraId = cameras[0].id;
+    // ✅ FIND BACK CAMERA
+    let cameraId = null;
+
+    for (let cam of cameras) {
+      const label = cam.label.toLowerCase();
+      if (
+        label.includes("back") ||
+        label.includes("rear") ||
+        label.includes("environment")
+      ) {
+        cameraId = cam.id;
+        break;
+      }
+    }
+
+    // fallback if not found
+    if(!cameraId){
+      cameraId = cameras[cameras.length - 1].id;
+    }
 
     html5QrCode.start(
       cameraId,
