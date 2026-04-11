@@ -4,8 +4,8 @@
   <title>Sari-Sari POS</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <!-- ZXING SCANNER -->
-  <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@latest"></script>
+  <!-- ✅ ZXING FIXED (UMD VERSION - NO ERROR) -->
+  <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/umd/index.min.js"></script>
 
   <!-- EXCEL EXPORT -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
@@ -88,7 +88,7 @@
 <script>
 
 //////////////////////////////////////////////////
-// 🔥 CONFIG
+// CONFIG
 //////////////////////////////////////////////////
 
 let URL = "https://script.google.com/macros/s/AKfycby6lyDIk9Gtdgk3hyIrDeWF3a5-PUdGw_UE98a2vFplhj6ln1RFY45gJYRVghCpQU0C/exec";
@@ -117,7 +117,7 @@ async function login(){
 }
 
 //////////////////////////////////////////////////
-// NAVIGATION
+// NAV
 //////////////////////////////////////////////////
 
 function show(id){
@@ -126,7 +126,7 @@ function show(id){
 }
 
 //////////////////////////////////////////////////
-// LOAD DATA FROM GOOGLE SHEETS
+// LOAD DATA
 //////////////////////////////////////////////////
 
 async function load(){
@@ -165,7 +165,7 @@ barcode.addEventListener("input", ()=>{
 });
 
 //////////////////////////////////////////////////
-// BUY FUNCTION
+// BUY
 //////////////////////////////////////////////////
 
 async function buy(){
@@ -239,13 +239,24 @@ function topSelling(){
 }
 
 //////////////////////////////////////////////////
-// 🔥 SCANNER (ZXING)
+// 🔥 SCANNER (ZXING FIXED)
 //////////////////////////////////////////////////
 
-let codeReader = null;
+let codeReader;
+
+window.onload = () => {
+  if(typeof ZXing === "undefined"){
+    alert("Scanner library failed to load. Check internet.");
+  }
+};
 
 async function startScan(){
   try {
+
+    if(typeof ZXing === "undefined"){
+      alert("ZXing not loaded");
+      return;
+    }
 
     codeReader = new ZXing.BrowserMultiFormatReader();
 
@@ -256,17 +267,13 @@ async function startScan(){
       return;
     }
 
-    const selectedDeviceId = devices[devices.length - 1].deviceId;
+    const deviceId = devices[devices.length - 1].deviceId;
 
-    codeReader.decodeFromVideoDevice(selectedDeviceId, 'video', (result, err) => {
+    codeReader.decodeFromVideoDevice(deviceId, 'video', (result, err) => {
 
       if(result){
-        const code = result.text;
-
-        // 🔥 AUTO FILL BARCODE
-        barcode.value = code;
+        barcode.value = result.text;
         barcode.dispatchEvent(new Event('input'));
-
         stopScan();
       }
 
