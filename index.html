@@ -120,7 +120,9 @@
       overflow: hidden;
       background: #000;
       position: relative;
-      display: none;
+      display: block;
+      width: 100%;
+      min-height: 220px;
     }
 
     #scannerPreview {
@@ -136,7 +138,7 @@
       top: 50%;
       width: 82%;
       max-width: 420px;
-      height: 120px;
+      height: 110px;
       transform: translate(-50%, -50%);
       border: 2px solid rgba(0, 255, 0, 0.9);
       border-radius: 10px;
@@ -178,21 +180,13 @@
       <div id="home" class="card page-section">
         <h2>Welcome</h2>
         <p>📢 System Ready</p>
-        <p class="scan-tip">
-          Important: open this on HTTPS when deployed, or camera access may fail.
-        </p>
+        <p class="scan-tip">Use HTTPS when deployed so camera access works properly.</p>
       </div>
 
       <div id="pos" class="card page-section hidden">
         <h2>Transaction</h2>
 
-        <input id="barcode" inputmode="numeric" autocomplete="off" placeholder="Scan or enter barcode" />
-
-        <div class="scan-actions">
-          <button onclick="startScan()">📷 Scan Barcode</button>
-          <button class="secondary-btn" onclick="stopScan()">⛔ Stop</button>
-        </div>
-
+        <!-- SCANNER MOVED TO TOP -->
         <div id="scannerWrap">
           <video id="scannerPreview" autoplay muted playsinline></video>
           <div class="scan-guide"></div>
@@ -200,8 +194,15 @@
 
         <div class="status" id="scanStatus">Scanner idle</div>
         <div class="scan-tip">
-          Hold the barcode inside the green box, 10–20 cm away, with good light.
+          Put the barcode inside the green box. Best distance is around 10–20 cm.
         </div>
+
+        <div class="scan-actions">
+          <button onclick="startScan()">📷 Start Scan</button>
+          <button class="secondary-btn" onclick="stopScan()">⛔ Stop</button>
+        </div>
+
+        <input id="barcode" inputmode="numeric" autocomplete="off" placeholder="Scan or enter barcode" />
 
         <div class="info-box">
           <div id="pname">Product: -</div>
@@ -225,10 +226,7 @@
   </div>
 
   <script type="module">
-    import {
-      BrowserMultiFormatReader
-    } from "https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/+esm";
-
+    import { BrowserMultiFormatReader } from "https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/+esm";
     import {
       BarcodeFormat,
       DecodeHintType,
@@ -249,7 +247,7 @@
     let scannerRunning = false;
     let lastScannedCode = "";
     let lastScannedAt = 0;
-    const SCAN_COOLDOWN_MS = 1500;
+    const SCAN_COOLDOWN_MS = 1200;
 
     //////////////////////////////////////////////////
     // DOM
@@ -443,21 +441,21 @@
     };
 
     //////////////////////////////////////////////////
-    // ZXING SCANNER
+    // FAST ZXING SCANNER
     //////////////////////////////////////////////////
 
     function createHints() {
       const hints = new Map();
+
+      // Keep only the most common retail formats for faster reading
       hints.set(DecodeHintType.POSSIBLE_FORMATS, [
         BarcodeFormat.EAN_13,
-        BarcodeFormat.EAN_8,
         BarcodeFormat.UPC_A,
-        BarcodeFormat.UPC_E,
         BarcodeFormat.CODE_128,
-        BarcodeFormat.CODE_39,
-        BarcodeFormat.ITF,
-        BarcodeFormat.CODABAR
+        BarcodeFormat.EAN_8
       ]);
+
+      hints.set(DecodeHintType.TRY_HARDER, true);
       return hints;
     }
 
@@ -485,6 +483,38 @@
       barcode.focus();
     }
 
+    async function applyFastCameraConstraints() {
+      const track = scannerPreview.srcObject &&
+                    scannerPreview.srcObject.getVideoTracks &&
+                    scannerPreview.srcObject.getVideoTracks()[0];
+
+      if (!track) return;
+
+      const capabilities = track.getCapabilities ? track.getCapabilities() : {};
+
+      const advanced = [];
+
+      if (capabilities.focusMode && capabilities.focusMode.includes("continuous")) {
+        advanced.push({ focusMode: "continuous" });
+      }
+
+      if (capabilities.exposureMode && capabilities.exposureMode.includes("continuous")) {
+        advanced.push({ exposureMode: "continuous" });
+      }
+
+      if (capabilities.whiteBalanceMode && capabilities.whiteBalanceMode.includes("continuous")) {
+        advanced.push({ whiteBalanceMode: "continuous" });
+      }
+
+      try {
+        await track.applyConstraints({
+          advanced
+        });
+      } catch (e) {
+        console.log("Constraint tuning skipped:", e);
+      }
+    }
+
     window.startScan = async function () {
       if (scannerRunning) return;
 
@@ -495,18 +525,29 @@
         }
 
         scanStatus.innerText = "Starting camera...";
-        scannerWrap.style.display = "block";
 
         const hints = createHints();
-        codeReader = new BrowserMultiFormatReader(hints);
+        codeReader = new BrowserMultiFormatReader(hints, {
+          delayBetweenScanAttempts: 30,
+          delayBetweenScanSuccess: 500
+        });
+
         const deviceId = await getBestDeviceId();
 
         scannerRunning = true;
 
-        scannerControls = await codeReader.decodeFromVideoDevice(
-          deviceId,
+        scannerControls = await codeReader.decodeFromConstraints(
+          {
+            audio: false,
+            video: {
+              deviceId: deviceId ? { exact: deviceId } : undefined,
+              facingMode: "environment",
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
+            }
+          },
           scannerPreview,
-          (result, err) => {
+          async (result, err) => {
             if (result) {
               const text = result.getText();
               const now = Date.now();
@@ -518,7 +559,7 @@
                 lastScannedCode = text;
                 lastScannedAt = now;
                 fillBarcodeField(text);
-                stopScan();
+                await stopScan();
               }
               return;
             }
@@ -529,12 +570,12 @@
           }
         );
 
+        await applyFastCameraConstraints();
         scanStatus.innerText = "Scanner running";
       } catch (err) {
         console.error(err);
         scannerRunning = false;
         scanStatus.innerText = "Camera error";
-        scannerWrap.style.display = "none";
         alert("Scanner failed: " + (err.message || err));
       }
     };
@@ -550,12 +591,16 @@
           codeReader.reset();
           codeReader = null;
         }
+
+        if (scannerPreview.srcObject) {
+          scannerPreview.srcObject.getTracks().forEach(track => track.stop());
+          scannerPreview.srcObject = null;
+        }
       } catch (err) {
         console.log(err);
       }
 
       scannerRunning = false;
-      scannerWrap.style.display = "none";
       scanStatus.innerText = "Scanner stopped";
     };
 
