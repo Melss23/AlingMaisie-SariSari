@@ -4,8 +4,8 @@
   <title>Sari-Sari POS</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <!-- ✅ ZXING FIXED -->
-  <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/umd/index.min.js"></script>
+  <!-- ✅ NEW SCANNER (REPLACES ZXING) -->
+  <script src="https://unpkg.com/html5-qrcode"></script>
 
   <!-- EXCEL EXPORT -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
@@ -48,11 +48,13 @@
 
   <div class="container">
 
+    <!-- HOME -->
     <div id="home" class="card">
       <h2>Welcome</h2>
       <p>📢 System Ready</p>
     </div>
 
+    <!-- POS -->
     <div id="pos" class="card hidden">
 
       <input id="barcode" placeholder="Scan or enter barcode">
@@ -60,7 +62,8 @@
       <button onclick="startScan()">📷 Scan Barcode</button>
       <button onclick="stopScan()">⛔ Stop</button>
 
-      <video id="video" autoplay playsinline></video>
+      <!-- camera view -->
+      <div id="video"></div>
 
       <div id="pname">Product: -</div>
       <div id="pprice">Price: -</div>
@@ -72,6 +75,7 @@
 
     </div>
 
+    <!-- ADMIN -->
     <div id="admin" class="card hidden">
       <button onclick="load()">Refresh</button>
       <button onclick="exportExcel()">Export Excel</button>
@@ -84,13 +88,14 @@
 
 <script>
 
+//////////////////////////////////////////////////
+// CONFIG
+//////////////////////////////////////////////////
+
 let URL = "https://script.google.com/macros/s/AKfycby6lyDIk9Gtdgk3hyIrDeWF3a5-PUdGw_UE98a2vFplhj6ln1RFY45gJYRVghCpQU0C/exec";
 
 let products = {};
 let sales = [];
-
-let codeReader = null;
-let selectedDeviceId = null;
 
 //////////////////////////////////////////////////
 // LOGIN
@@ -122,7 +127,7 @@ function show(id){
 }
 
 //////////////////////////////////////////////////
-// LOAD
+// LOAD DATA
 //////////////////////////////////////////////////
 
 async function load(){
@@ -143,7 +148,7 @@ async function load(){
 }
 
 //////////////////////////////////////////////////
-// PRODUCT LOOKUP
+// AUTO PRODUCT LOAD
 //////////////////////////////////////////////////
 
 barcode.addEventListener("input", ()=>{
@@ -232,37 +237,44 @@ function topSelling(){
 }
 
 //////////////////////////////////////////////////
-// ✅ ZXING FIXED SCANNER
+// ✅ NEW SCANNER (html5-qrcode)
 //////////////////////////////////////////////////
 
+let html5QrCode = null;
+
 async function startScan(){
+
   try {
 
-    if(!window.ZXing || !ZXing.BrowserMultiFormatReader){
-      alert("ZXing library not loaded");
+    if(!window.Html5Qrcode){
+      alert("Scanner library not loaded");
       return;
     }
 
-    codeReader = new ZXing.BrowserMultiFormatReader();
+    html5QrCode = new Html5Qrcode("video");
 
-    const devices = await codeReader.listVideoInputDevices();
+    const cameras = await Html5Qrcode.getCameras();
 
-    if(!devices || devices.length === 0){
+    if(!cameras || cameras.length === 0){
       alert("No camera found");
       return;
     }
 
-    selectedDeviceId = devices[0].deviceId;
+    const cameraId = cameras[0].id;
 
-    codeReader.decodeFromVideoDevice(
-      selectedDeviceId,
-      "video",
-      (result, err) => {
-        if(result){
-          barcode.value = result.text;
-          barcode.dispatchEvent(new Event("input"));
-          stopScan();
-        }
+    html5QrCode.start(
+      cameraId,
+      {
+        fps: 10,
+        qrbox: 250
+      },
+      (decodedText) => {
+
+        barcode.value = decodedText;
+        barcode.dispatchEvent(new Event("input"));
+
+        stopScan();
+
       }
     );
 
@@ -272,9 +284,11 @@ async function startScan(){
 }
 
 function stopScan(){
-  if(codeReader){
-    codeReader.reset();
-    codeReader = null;
+  if(html5QrCode){
+    html5QrCode.stop().then(()=>{
+      html5QrCode.clear();
+      html5QrCode = null;
+    }).catch(()=>{});
   }
 }
 
