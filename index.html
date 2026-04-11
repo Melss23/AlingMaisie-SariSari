@@ -4,7 +4,7 @@
   <title>Sari-Sari POS</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <!-- ✅ ZXING FIXED (UMD VERSION - NO ERROR) -->
+  <!-- ✅ ZXING FIXED -->
   <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/umd/index.min.js"></script>
 
   <!-- EXCEL EXPORT -->
@@ -48,13 +48,11 @@
 
   <div class="container">
 
-    <!-- HOME -->
     <div id="home" class="card">
       <h2>Welcome</h2>
       <p>📢 System Ready</p>
     </div>
 
-    <!-- POS -->
     <div id="pos" class="card hidden">
 
       <input id="barcode" placeholder="Scan or enter barcode">
@@ -74,7 +72,6 @@
 
     </div>
 
-    <!-- ADMIN -->
     <div id="admin" class="card hidden">
       <button onclick="load()">Refresh</button>
       <button onclick="exportExcel()">Export Excel</button>
@@ -87,14 +84,13 @@
 
 <script>
 
-//////////////////////////////////////////////////
-// CONFIG
-//////////////////////////////////////////////////
-
 let URL = "https://script.google.com/macros/s/AKfycby6lyDIk9Gtdgk3hyIrDeWF3a5-PUdGw_UE98a2vFplhj6ln1RFY45gJYRVghCpQU0C/exec";
 
 let products = {};
 let sales = [];
+
+let codeReader = null;
+let selectedDeviceId = null;
 
 //////////////////////////////////////////////////
 // LOGIN
@@ -126,7 +122,7 @@ function show(id){
 }
 
 //////////////////////////////////////////////////
-// LOAD DATA
+// LOAD
 //////////////////////////////////////////////////
 
 async function load(){
@@ -147,7 +143,7 @@ async function load(){
 }
 
 //////////////////////////////////////////////////
-// AUTO LOAD PRODUCT
+// PRODUCT LOOKUP
 //////////////////////////////////////////////////
 
 barcode.addEventListener("input", ()=>{
@@ -183,17 +179,14 @@ async function buy(){
     return;
   }
 
-  let total = p.srp * q;
-  let profit = p.margin * q;
-
   let res = await fetch(URL,{
     method:"POST",
     body: JSON.stringify({
       barcode: code,
       name: p.name,
       qty:q,
-      total:total,
-      profit:profit
+      total:p.srp*q,
+      profit:p.margin*q
     })
   });
 
@@ -239,45 +232,39 @@ function topSelling(){
 }
 
 //////////////////////////////////////////////////
-// 🔥 SCANNER (ZXING FIXED)
+// ✅ ZXING FIXED SCANNER
 //////////////////////////////////////////////////
-
-let codeReader;
-
-window.onload = () => {
-  if(typeof ZXing === "undefined"){
-    alert("Scanner library failed to load. Check internet.");
-  }
-};
 
 async function startScan(){
   try {
 
-    if(typeof ZXing === "undefined"){
-      alert("ZXing not loaded");
+    if(!window.ZXing || !ZXing.BrowserMultiFormatReader){
+      alert("ZXing library not loaded");
       return;
     }
 
     codeReader = new ZXing.BrowserMultiFormatReader();
 
-    const devices = await ZXing.BrowserCodeReader.listVideoInputDevices();
+    const devices = await codeReader.listVideoInputDevices();
 
-    if(devices.length === 0){
+    if(!devices || devices.length === 0){
       alert("No camera found");
       return;
     }
 
-    const deviceId = devices[devices.length - 1].deviceId;
+    selectedDeviceId = devices[0].deviceId;
 
-    codeReader.decodeFromVideoDevice(deviceId, 'video', (result, err) => {
-
-      if(result){
-        barcode.value = result.text;
-        barcode.dispatchEvent(new Event('input'));
-        stopScan();
+    codeReader.decodeFromVideoDevice(
+      selectedDeviceId,
+      "video",
+      (result, err) => {
+        if(result){
+          barcode.value = result.text;
+          barcode.dispatchEvent(new Event("input"));
+          stopScan();
+        }
       }
-
-    });
+    );
 
   } catch(err){
     alert("Camera error: " + err.message);
@@ -287,6 +274,7 @@ async function startScan(){
 function stopScan(){
   if(codeReader){
     codeReader.reset();
+    codeReader = null;
   }
 }
 
