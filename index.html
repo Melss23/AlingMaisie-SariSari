@@ -4,22 +4,130 @@
   <title>Sari-Sari POS</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <!-- ✅ NEW SCANNER (REPLACES ZXING) -->
+  <!-- SCANNER -->
   <script src="https://unpkg.com/html5-qrcode"></script>
 
   <!-- EXCEL EXPORT -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
   <style>
-    body { font-family: Arial; margin:0; background:#f4f6f9; }
-    .header { background:#4CAF50; color:white; padding:15px; text-align:center; }
-    .nav { display:flex; background:white; }
-    .nav button { flex:1; padding:12px; border:none; }
-    .container { padding:20px; }
-    .card { background:white; padding:20px; border-radius:10px; margin-bottom:20px; }
-    input,button { width:100%; padding:12px; margin-top:10px; }
-    .hidden { display:none; }
-    video { width:100%; border-radius:10px; margin-top:10px; }
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      background: #f4f6f9;
+    }
+
+    .header {
+      background: #4CAF50;
+      color: white;
+      padding: 15px;
+      text-align: center;
+      font-size: 20px;
+      font-weight: bold;
+    }
+
+    .nav {
+      display: flex;
+      background: white;
+      border-bottom: 1px solid #ddd;
+    }
+
+    .nav button {
+      flex: 1;
+      padding: 12px;
+      border: none;
+      background: white;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .nav button:hover {
+      background: #f0f0f0;
+    }
+
+    .container {
+      padding: 20px;
+    }
+
+    .card {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    }
+
+    input, button {
+      width: 100%;
+      padding: 12px;
+      margin-top: 10px;
+      box-sizing: border-box;
+      font-size: 16px;
+      border-radius: 8px;
+    }
+
+    input {
+      border: 1px solid #ccc;
+    }
+
+    button {
+      border: none;
+      cursor: pointer;
+      background: #4CAF50;
+      color: white;
+      font-weight: bold;
+    }
+
+    button:hover {
+      opacity: 0.95;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    #video {
+      width: 100%;
+      margin-top: 12px;
+      overflow: hidden;
+      border-radius: 10px;
+      background: #000;
+    }
+
+    #video video {
+      width: 100% !important;
+      border-radius: 10px;
+    }
+
+    .scan-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .secondary-btn {
+      background: #f44336;
+    }
+
+    .info-box {
+      margin-top: 15px;
+      padding: 12px;
+      background: #f8f8f8;
+      border-radius: 8px;
+      line-height: 1.6;
+    }
+
+    .status {
+      margin-top: 10px;
+      font-size: 14px;
+      color: #333;
+    }
+
+    #report {
+      margin-top: 15px;
+      line-height: 1.8;
+    }
   </style>
 </head>
 
@@ -56,27 +164,33 @@
 
     <!-- POS -->
     <div id="pos" class="card hidden">
+      <h2>Transaction</h2>
 
-      <input id="barcode" placeholder="Scan or enter barcode">
+      <input id="barcode" inputmode="numeric" autocomplete="off" placeholder="Scan or enter barcode">
 
-      <button onclick="startScan()">📷 Scan Barcode</button>
-      <button onclick="stopScan()">⛔ Stop</button>
+      <div class="scan-actions">
+        <button onclick="startScan()">📷 Scan Barcode</button>
+        <button class="secondary-btn" onclick="stopScan()">⛔ Stop</button>
+      </div>
 
-      <!-- camera view -->
       <div id="video"></div>
 
-      <div id="pname">Product: -</div>
-      <div id="pprice">Price: -</div>
-      <div>Stock: <span id="pstock">-</span></div>
+      <div class="status" id="scanStatus">Scanner idle</div>
 
-      <input id="qty" type="number" value="1">
+      <div class="info-box">
+        <div id="pname">Product: -</div>
+        <div id="pprice">Price: -</div>
+        <div>Stock: <span id="pstock">-</span></div>
+      </div>
+
+      <input id="qty" type="number" value="1" min="1">
 
       <button onclick="buy()">Buy</button>
-
     </div>
 
     <!-- ADMIN -->
     <div id="admin" class="card hidden">
+      <h2>Admin</h2>
       <button onclick="load()">Refresh</button>
       <button onclick="exportExcel()">Export Excel</button>
       <button onclick="topSelling()">Top Selling</button>
@@ -87,7 +201,6 @@
 </div>
 
 <script>
-
 //////////////////////////////////////////////////
 // CONFIG
 //////////////////////////////////////////////////
@@ -97,15 +210,38 @@ let URL = "https://script.google.com/macros/s/AKfycby6lyDIk9Gtdgk3hyIrDeWF3a5-PU
 let products = {};
 let sales = [];
 
+let html5QrCode = null;
+let scannerRunning = false;
+let lastScannedCode = "";
+let lastScannedAt = 0;
+let scanCooldownMs = 1500;
+
+//////////////////////////////////////////////////
+// DOM REFERENCES
+//////////////////////////////////////////////////
+
+const barcode = document.getElementById("barcode");
+const qty = document.getElementById("qty");
+const pname = document.getElementById("pname");
+const pprice = document.getElementById("pprice");
+const pstock = document.getElementById("pstock");
+const report = document.getElementById("report");
+const adminBtn = document.getElementById("adminBtn");
+const loginPage = document.getElementById("loginPage");
+const app = document.getElementById("app");
+const user = document.getElementById("user");
+const pass = document.getElementById("pass");
+const scanStatus = document.getElementById("scanStatus");
+
 //////////////////////////////////////////////////
 // LOGIN
 //////////////////////////////////////////////////
 
-async function login(){
-  if(user.value==="admin" && pass.value==="1234"){
-    adminBtn.style.display="block";
-  } else if(user.value==="cashier" && pass.value==="1234"){
-    adminBtn.style.display="none";
+async function login() {
+  if (user.value === "admin" && pass.value === "1234") {
+    adminBtn.style.display = "block";
+  } else if (user.value === "cashier" && pass.value === "1234") {
+    adminBtn.style.display = "none";
   } else {
     alert("Invalid login");
     return;
@@ -115,14 +251,15 @@ async function login(){
   app.classList.remove("hidden");
 
   await load();
+  show("home");
 }
 
 //////////////////////////////////////////////////
 // NAV
 //////////////////////////////////////////////////
 
-function show(id){
-  document.querySelectorAll(".card").forEach(c=>c.classList.add("hidden"));
+function show(id) {
+  document.querySelectorAll(".card").forEach(c => c.classList.add("hidden"));
   document.getElementById(id).classList.remove("hidden");
 }
 
@@ -130,37 +267,45 @@ function show(id){
 // LOAD DATA
 //////////////////////////////////////////////////
 
-async function load(){
-  let res = await fetch(URL);
-  let data = await res.json();
+async function load() {
+  try {
+    let res = await fetch(URL);
+    let data = await res.json();
 
-  products = {};
-  data.products.slice(1).forEach(r=>{
-    products[String(r[0]).trim()] = {
-      name:r[1],
-      srp:Number(r[2]),
-      margin:Number(r[3]),
-      stock:Number(r[4])
-    };
-  });
+    products = {};
+    if (data.products && data.products.length > 1) {
+      data.products.slice(1).forEach(r => {
+        products[String(r[0]).trim()] = {
+          name: r[1],
+          srp: Number(r[2]),
+          margin: Number(r[3]),
+          stock: Number(r[4])
+        };
+      });
+    }
 
-  sales = data.sales;
+    sales = data.sales || [];
+  } catch (err) {
+    alert("Failed to load data");
+    console.error(err);
+  }
 }
 
 //////////////////////////////////////////////////
 // AUTO PRODUCT LOAD
 //////////////////////////////////////////////////
 
-barcode.addEventListener("input", ()=>{
-  let p = products[barcode.value.trim()];
+barcode.addEventListener("input", () => {
+  let code = barcode.value.trim();
+  let p = products[code];
 
-  if(p){
+  if (p) {
     pname.innerText = "Product: " + p.name;
-    pprice.innerText = "Price: ₱" + p.srp;
+    pprice.innerText = "Price: ₱" + p.srp.toFixed(2);
     pstock.innerText = p.stock;
   } else {
     pname.innerText = "Product: NOT FOUND";
-    pprice.innerText = "-";
+    pprice.innerText = "Price: -";
     pstock.innerText = "-";
   }
 });
@@ -169,42 +314,63 @@ barcode.addEventListener("input", ()=>{
 // BUY
 //////////////////////////////////////////////////
 
-async function buy(){
+async function buy() {
   let code = barcode.value.trim();
   let p = products[code];
-  let q = parseInt(qty.value);
+  let q = parseInt(qty.value, 10);
 
-  if(!p){
+  if (!p) {
     alert("Product not found");
     return;
   }
 
-  if(p.stock < q){
+  if (!q || q <= 0) {
+    alert("Invalid quantity");
+    return;
+  }
+
+  if (p.stock < q) {
     alert("Not enough stock");
     return;
   }
 
-  let res = await fetch(URL,{
-    method:"POST",
-    body: JSON.stringify({
-      barcode: code,
-      name: p.name,
-      qty:q,
-      total:p.srp*q,
-      profit:p.margin*q
-    })
-  });
+  try {
+    let res = await fetch(URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "text/plain;charset=utf-8"
+      },
+      body: JSON.stringify({
+        barcode: code,
+        name: p.name,
+        qty: q,
+        total: p.srp * q,
+        profit: p.margin * q
+      })
+    });
 
-  alert(await res.text());
-  load();
+    alert(await res.text());
+
+    barcode.value = "";
+    qty.value = 1;
+    pname.innerText = "Product: -";
+    pprice.innerText = "Price: -";
+    pstock.innerText = "-";
+
+    await load();
+    barcode.focus();
+  } catch (err) {
+    alert("Failed to save transaction");
+    console.error(err);
+  }
 }
 
 //////////////////////////////////////////////////
 // EXPORT
 //////////////////////////////////////////////////
 
-function exportExcel(){
-  let formatted = sales.slice(1).map(s => ({
+function exportExcel() {
+  let formatted = (sales || []).slice(1).map(s => ({
     Date: s[0],
     Product: s[1],
     Qty: s[2],
@@ -223,92 +389,180 @@ function exportExcel(){
 // TOP SELLING
 //////////////////////////////////////////////////
 
-function topSelling(){
+function topSelling() {
   let map = {};
 
-  sales.slice(1).forEach(s=>{
-    map[s[1]] = (map[s[1]]||0)+Number(s[2]);
+  (sales || []).slice(1).forEach(s => {
+    map[s[1]] = (map[s[1]] || 0) + Number(s[2]);
   });
 
-  report.innerHTML = Object.entries(map)
-    .sort((a,b)=>b[1]-a[1])
-    .map(i=>i[0]+" - "+i[1]+" pcs")
+  let html = Object.entries(map)
+    .sort((a, b) => b[1] - a[1])
+    .map(i => i[0] + " - " + i[1] + " pcs")
     .join("<br>");
+
+  report.innerHTML = html || "No sales data";
 }
 
 //////////////////////////////////////////////////
-// ✅ NEW SCANNER (html5-qrcode)
+// SCANNER
 //////////////////////////////////////////////////
 
-async function startScan(){
-
+async function startScan() {
   try {
-
-    if(!window.Html5Qrcode){
+    if (!window.Html5Qrcode) {
       alert("Scanner library not loaded");
       return;
     }
+
+    if (scannerRunning) {
+      return;
+    }
+
+    document.getElementById("video").innerHTML = "";
+    scanStatus.innerText = "Starting camera...";
 
     html5QrCode = new Html5Qrcode("video");
 
     const cameras = await Html5Qrcode.getCameras();
 
-    if(!cameras || cameras.length === 0){
+    if (!cameras || cameras.length === 0) {
+      scanStatus.innerText = "No camera found";
       alert("No camera found");
       return;
     }
 
-    // ✅ FORCE BACK CAMERA
-    let cameraId = cameras[0].id;
+    let preferredCameraId = cameras[0].id;
 
-    for (let cam of cameras) {
-      const label = cam.label.toLowerCase();
-      if (label.includes("back") || label.includes("rear") || label.includes("environment")) {
-        cameraId = cam.id;
+    for (const cam of cameras) {
+      const label = (cam.label || "").toLowerCase();
+      if (
+        label.includes("back") ||
+        label.includes("rear") ||
+        label.includes("environment")
+      ) {
+        preferredCameraId = cam.id;
         break;
       }
     }
 
-    // ✅ START SCANNER (BARCODE ONLY FOCUS)
-    html5QrCode.start(
-      cameraId,
+    const isMobile = /iphone|ipad|ipod|android/i.test(navigator.userAgent);
+    const scanBox = isMobile
+      ? { width: Math.min(window.innerWidth * 0.78, 320), height: 140 }
+      : { width: 320, height: 160 };
+
+    scannerRunning = true;
+
+    await html5QrCode.start(
+      { deviceId: { exact: preferredCameraId } },
       {
-        fps: 12,
-        qrbox: { width: 300, height: 150 }, // rectangular = better for barcode
+        fps: 15,
+        qrbox: scanBox,
+        aspectRatio: 1.7778,
+        disableFlip: false,
+        experimentalFeatures: {
+          useBarCodeDetectorIfSupported: true
+        },
         formatsToSupport: [
           Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
           Html5QrcodeSupportedFormats.EAN_13,
           Html5QrcodeSupportedFormats.EAN_8,
           Html5QrcodeSupportedFormats.UPC_A,
-          Html5QrcodeSupportedFormats.UPC_E
-        ]
+          Html5QrcodeSupportedFormats.UPC_E,
+          Html5QrcodeSupportedFormats.ITF
+        ],
+        videoConstraints: {
+          facingMode: { ideal: "environment" }
+        }
       },
-      (decodedText) => {
-
-        // ✅ ALWAYS STORE TO BARCODE FIELD
-        barcode.value = decodedText.trim();
-        barcode.dispatchEvent(new Event("input"));
-
-        // optional auto-stop after scan
-        stopScan();
-
-      }
+      onScanSuccess,
+      onScanFailure
     );
 
-  } catch(err){
-    alert("Camera error: " + err.message);
-  }
-}
+    scanStatus.innerText = "Scanner running";
+  } catch (err) {
+    scannerRunning = false;
 
-function stopScan(){
-  if(html5QrCode){
-    html5QrCode.stop().then(()=>{
-      html5QrCode.clear();
+    if (html5QrCode) {
+      try {
+        await html5QrCode.clear();
+      } catch (e) {}
       html5QrCode = null;
-    }).catch(()=>{});
+    }
+
+    scanStatus.innerText = "Camera error";
+    alert("Camera error: " + (err.message || err));
   }
 }
 
+async function stopScan() {
+  scanStatus.innerText = "Stopping scanner...";
+
+  if (!html5QrCode) {
+    scannerRunning = false;
+    scanStatus.innerText = "Scanner idle";
+    return;
+  }
+
+  try {
+    await html5QrCode.stop();
+  } catch (e) {
+  }
+
+  try {
+    await html5QrCode.clear();
+  } catch (e) {
+  }
+
+  html5QrCode = null;
+  scannerRunning = false;
+  scanStatus.innerText = "Scanner stopped";
+}
+
+function onScanSuccess(decodedText) {
+  const cleanCode = String(decodedText || "").trim();
+  const now = Date.now();
+
+  if (!cleanCode) return;
+
+  if (cleanCode === lastScannedCode && now - lastScannedAt < scanCooldownMs) {
+    return;
+  }
+
+  lastScannedCode = cleanCode;
+  lastScannedAt = now;
+
+  barcode.value = cleanCode;
+  barcode.dispatchEvent(new Event("input"));
+
+  if (products[cleanCode]) {
+    scanStatus.innerText = "Scanned: " + cleanCode;
+    stopScan();
+    barcode.focus();
+  } else {
+    scanStatus.innerText = "Barcode not found in product list";
+  }
+}
+
+function onScanFailure(error) {
+}
+
+//////////////////////////////////////////////////
+// UX
+//////////////////////////////////////////////////
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden && scannerRunning) {
+    stopScan();
+  }
+});
+
+window.addEventListener("beforeunload", () => {
+  if (scannerRunning) {
+    stopScan();
+  }
+});
 </script>
 
 </body>
