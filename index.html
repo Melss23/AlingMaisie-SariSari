@@ -4,10 +4,7 @@
   <title>Sari-Sari POS</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <!-- SCANNER -->
   <script src="https://unpkg.com/html5-qrcode"></script>
-
-  <!-- EXCEL EXPORT -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
   <style>
@@ -39,6 +36,7 @@
       background: white;
       font-size: 14px;
       cursor: pointer;
+      color: #222;
     }
 
     .nav button:hover {
@@ -83,7 +81,7 @@
     }
 
     .hidden {
-      display: none;
+      display: none !important;
     }
 
     #video {
@@ -92,6 +90,7 @@
       overflow: hidden;
       border-radius: 10px;
       background: #000;
+      min-height: 20px;
     }
 
     #video video {
@@ -149,21 +148,19 @@
 <div id="app" class="hidden">
 
   <div class="nav">
-    <button onclick="show('home')">Home</button>
-    <button onclick="show('pos')">Transaction</button>
-    <button onclick="show('admin')" id="adminBtn">Admin</button>
+    <button onclick="showPage('home')">Home</button>
+    <button onclick="showPage('pos')">Transaction</button>
+    <button onclick="showPage('admin')" id="adminBtn">Admin</button>
   </div>
 
   <div class="container">
 
-    <!-- HOME -->
-    <div id="home" class="card">
+    <div id="home" class="card page-section">
       <h2>Welcome</h2>
       <p>📢 System Ready</p>
     </div>
 
-    <!-- POS -->
-    <div id="pos" class="card hidden">
+    <div id="pos" class="card page-section hidden">
       <h2>Transaction</h2>
 
       <input id="barcode" inputmode="numeric" autocomplete="off" placeholder="Scan or enter barcode">
@@ -188,8 +185,7 @@
       <button onclick="buy()">Buy</button>
     </div>
 
-    <!-- ADMIN -->
-    <div id="admin" class="card hidden">
+    <div id="admin" class="card page-section hidden">
       <h2>Admin</h2>
       <button onclick="load()">Refresh</button>
       <button onclick="exportExcel()">Export Excel</button>
@@ -201,10 +197,6 @@
 </div>
 
 <script>
-//////////////////////////////////////////////////
-// CONFIG
-//////////////////////////////////////////////////
-
 let URL = "https://script.google.com/macros/s/AKfycby6lyDIk9Gtdgk3hyIrDeWF3a5-PUdGw_UE98a2vFplhj6ln1RFY45gJYRVghCpQU0C/exec";
 
 let products = {};
@@ -215,10 +207,6 @@ let scannerRunning = false;
 let lastScannedCode = "";
 let lastScannedAt = 0;
 let scanCooldownMs = 1500;
-
-//////////////////////////////////////////////////
-// DOM REFERENCES
-//////////////////////////////////////////////////
 
 const barcode = document.getElementById("barcode");
 const qty = document.getElementById("qty");
@@ -232,10 +220,6 @@ const app = document.getElementById("app");
 const user = document.getElementById("user");
 const pass = document.getElementById("pass");
 const scanStatus = document.getElementById("scanStatus");
-
-//////////////////////////////////////////////////
-// LOGIN
-//////////////////////////////////////////////////
 
 async function login() {
   if (user.value === "admin" && pass.value === "1234") {
@@ -251,21 +235,16 @@ async function login() {
   app.classList.remove("hidden");
 
   await load();
-  show("home");
+  showPage("home");
 }
 
-//////////////////////////////////////////////////
-// NAV
-//////////////////////////////////////////////////
+function showPage(id) {
+  document.querySelectorAll(".page-section").forEach(section => {
+    section.classList.add("hidden");
+  });
 
-function show(id) {
-  document.querySelectorAll(".card").forEach(c => c.classList.add("hidden"));
   document.getElementById(id).classList.remove("hidden");
 }
-
-//////////////////////////////////////////////////
-// LOAD DATA
-//////////////////////////////////////////////////
 
 async function load() {
   try {
@@ -291,10 +270,6 @@ async function load() {
   }
 }
 
-//////////////////////////////////////////////////
-// AUTO PRODUCT LOAD
-//////////////////////////////////////////////////
-
 barcode.addEventListener("input", () => {
   let code = barcode.value.trim();
   let p = products[code];
@@ -309,10 +284,6 @@ barcode.addEventListener("input", () => {
     pstock.innerText = "-";
   }
 });
-
-//////////////////////////////////////////////////
-// BUY
-//////////////////////////////////////////////////
 
 async function buy() {
   let code = barcode.value.trim();
@@ -365,10 +336,6 @@ async function buy() {
   }
 }
 
-//////////////////////////////////////////////////
-// EXPORT
-//////////////////////////////////////////////////
-
 function exportExcel() {
   let formatted = (sales || []).slice(1).map(s => ({
     Date: s[0],
@@ -385,10 +352,6 @@ function exportExcel() {
   XLSX.writeFile(wb, "sales.xlsx");
 }
 
-//////////////////////////////////////////////////
-// TOP SELLING
-//////////////////////////////////////////////////
-
 function topSelling() {
   let map = {};
 
@@ -404,10 +367,6 @@ function topSelling() {
   report.innerHTML = html || "No sales data";
 }
 
-//////////////////////////////////////////////////
-// SCANNER
-//////////////////////////////////////////////////
-
 async function startScan() {
   try {
     if (!window.Html5Qrcode) {
@@ -415,9 +374,7 @@ async function startScan() {
       return;
     }
 
-    if (scannerRunning) {
-      return;
-    }
+    if (scannerRunning) return;
 
     document.getElementById("video").innerHTML = "";
     scanStatus.innerText = "Starting camera...";
@@ -507,13 +464,11 @@ async function stopScan() {
 
   try {
     await html5QrCode.stop();
-  } catch (e) {
-  }
+  } catch (e) {}
 
   try {
     await html5QrCode.clear();
-  } catch (e) {
-  }
+  } catch (e) {}
 
   html5QrCode = null;
   scannerRunning = false;
@@ -548,18 +503,8 @@ function onScanSuccess(decodedText) {
 function onScanFailure(error) {
 }
 
-//////////////////////////////////////////////////
-// UX
-//////////////////////////////////////////////////
-
 document.addEventListener("visibilitychange", () => {
   if (document.hidden && scannerRunning) {
-    stopScan();
-  }
-});
-
-window.addEventListener("beforeunload", () => {
-  if (scannerRunning) {
     stopScan();
   }
 });
