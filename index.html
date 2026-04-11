@@ -4,11 +4,11 @@
   <title>Sari-Sari POS</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <!-- Excel Export -->
-  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <!-- ZXING SCANNER -->
+  <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@latest"></script>
 
-  <!-- 🔥 SCANNER (ZXING - ANDROID + IOS) -->
-  <script src="https://unpkg.com/@zxing/browser@latest"></script>
+  <!-- EXCEL EXPORT -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
   <style>
     body { font-family: Arial; margin:0; background:#f4f6f9; }
@@ -17,7 +17,7 @@
     .nav button { flex:1; padding:12px; border:none; }
     .container { padding:20px; }
     .card { background:white; padding:20px; border-radius:10px; margin-bottom:20px; }
-    input,button { width:100%; padding:10px; margin-top:10px; }
+    input,button { width:100%; padding:12px; margin-top:10px; }
     .hidden { display:none; }
     video { width:100%; border-radius:10px; margin-top:10px; }
   </style>
@@ -87,12 +87,19 @@
 
 <script>
 
+//////////////////////////////////////////////////
+// 🔥 CONFIG
+//////////////////////////////////////////////////
+
 let URL = "https://script.google.com/macros/s/AKfycby6lyDIk9Gtdgk3hyIrDeWF3a5-PUdGw_UE98a2vFplhj6ln1RFY45gJYRVghCpQU0C/exec";
 
 let products = {};
 let sales = [];
 
+//////////////////////////////////////////////////
 // LOGIN
+//////////////////////////////////////////////////
+
 async function login(){
   if(user.value==="admin" && pass.value==="1234"){
     adminBtn.style.display="block";
@@ -103,19 +110,25 @@ async function login(){
     return;
   }
 
-  document.getElementById("loginPage").classList.add("hidden");
-  document.getElementById("app").classList.remove("hidden");
+  loginPage.classList.add("hidden");
+  app.classList.remove("hidden");
 
   await load();
 }
 
+//////////////////////////////////////////////////
 // NAVIGATION
+//////////////////////////////////////////////////
+
 function show(id){
   document.querySelectorAll(".card").forEach(c=>c.classList.add("hidden"));
   document.getElementById(id).classList.remove("hidden");
 }
 
-// LOAD DATA
+//////////////////////////////////////////////////
+// LOAD DATA FROM GOOGLE SHEETS
+//////////////////////////////////////////////////
+
 async function load(){
   let res = await fetch(URL);
   let data = await res.json();
@@ -133,7 +146,10 @@ async function load(){
   sales = data.sales;
 }
 
+//////////////////////////////////////////////////
 // AUTO LOAD PRODUCT
+//////////////////////////////////////////////////
+
 barcode.addEventListener("input", ()=>{
   let p = products[barcode.value.trim()];
 
@@ -148,7 +164,10 @@ barcode.addEventListener("input", ()=>{
   }
 });
 
-// BUY
+//////////////////////////////////////////////////
+// BUY FUNCTION
+//////////////////////////////////////////////////
+
 async function buy(){
   let code = barcode.value.trim();
   let p = products[code];
@@ -182,7 +201,10 @@ async function buy(){
   load();
 }
 
-// EXPORT EXCEL
+//////////////////////////////////////////////////
+// EXPORT
+//////////////////////////////////////////////////
+
 function exportExcel(){
   let formatted = sales.slice(1).map(s => ({
     Date: s[0],
@@ -199,7 +221,10 @@ function exportExcel(){
   XLSX.writeFile(wb, "sales.xlsx");
 }
 
+//////////////////////////////////////////////////
 // TOP SELLING
+//////////////////////////////////////////////////
+
 function topSelling(){
   let map = {};
 
@@ -214,7 +239,7 @@ function topSelling(){
 }
 
 //////////////////////////////////////////////////
-// 🔥 SCANNER (ANDROID + IOS)
+// 🔥 SCANNER (ZXING)
 //////////////////////////////////////////////////
 
 let codeReader = null;
@@ -238,7 +263,7 @@ async function startScan(){
       if(result){
         const code = result.text;
 
-        // 🔥 MAIN LOGIC
+        // 🔥 AUTO FILL BARCODE
         barcode.value = code;
         barcode.dispatchEvent(new Event('input'));
 
