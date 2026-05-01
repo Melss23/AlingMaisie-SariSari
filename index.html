@@ -120,14 +120,12 @@
       overflow: hidden;
       background: #000;
       position: relative;
-      display: block;
       width: 100%;
       min-height: 220px;
     }
 
     #scannerPreview {
       width: 100%;
-      height: auto;
       display: block;
       background: #000;
     }
@@ -137,12 +135,11 @@
       left: 50%;
       top: 50%;
       width: 82%;
-      max-width: 420px;
       height: 110px;
       transform: translate(-50%, -50%);
-      border: 2px solid rgba(0, 255, 0, 0.9);
+      border: 2px solid rgba(0,255,0,0.9);
       border-radius: 10px;
-      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.18);
+      box-shadow: 0 0 0 9999px rgba(0,0,0,0.18);
       pointer-events: none;
     }
 
@@ -150,475 +147,228 @@
       font-size: 12px;
       color: #666;
       margin-top: 8px;
-      line-height: 1.5;
     }
   </style>
 </head>
 
 <body>
-  <div class="header">🛒 Sari-Sari POS</div>
 
-  <!-- LOGIN -->
-  <div id="loginPage" class="container">
-    <div class="card">
-      <h3>Login</h3>
-      <input id="user" placeholder="Username" />
-      <input id="pass" type="password" placeholder="Password" />
-      <button onclick="login()">Login</button>
-    </div>
+<div class="header">🛒 Sari-Sari POS</div>
+
+<!-- LOGIN -->
+<div id="loginPage" class="container">
+  <div class="card">
+    <h3>Login</h3>
+    <input id="user" placeholder="Username">
+    <input id="pass" type="password" placeholder="Password">
+    <button onclick="login()">Login</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="hidden">
+
+  <div class="nav">
+    <button onclick="showPage('home')">Home</button>
+    <button onclick="showPage('pos')">Transaction</button>
+    <button onclick="showPage('admin')" id="adminBtn">Admin</button>
   </div>
 
-  <!-- APP -->
-  <div id="app" class="hidden">
-    <div class="nav">
-      <button onclick="showPage('home')">Home</button>
-      <button onclick="showPage('pos')">Transaction</button>
-      <button onclick="showPage('admin')" id="adminBtn">Admin</button>
+  <div class="container">
+
+    <div id="home" class="card page-section">
+      <h2>Welcome</h2>
+      <p>📢 System Ready</p>
     </div>
 
-    <div class="container">
-      <div id="home" class="card page-section">
-        <h2>Welcome</h2>
-        <p>📢 System Ready</p>
-        <p class="scan-tip">Use HTTPS when deployed so camera access works properly.</p>
+    <div id="pos" class="card page-section hidden">
+      <h2>Transaction</h2>
+
+      <div id="scannerWrap">
+        <video id="scannerPreview" autoplay muted playsinline></video>
+        <div class="scan-guide"></div>
       </div>
 
-      <div id="pos" class="card page-section hidden">
-        <h2>Transaction</h2>
+      <div class="status" id="scanStatus">Scanner idle</div>
 
-        <!-- SCANNER MOVED TO TOP -->
-        <div id="scannerWrap">
-          <video id="scannerPreview" autoplay muted playsinline></video>
-          <div class="scan-guide"></div>
-        </div>
-
-        <div class="status" id="scanStatus">Scanner idle</div>
-        <div class="scan-tip">
-          Put the barcode inside the green box. Best distance is around 10–20 cm.
-        </div>
-
-        <div class="scan-actions">
-          <button onclick="startScan()">📷 Start Scan</button>
-          <button class="secondary-btn" onclick="stopScan()">⛔ Stop</button>
-        </div>
-
-        <input id="barcode" inputmode="numeric" autocomplete="off" placeholder="Scan or enter barcode" />
-
-        <div class="info-box">
-          <div id="pname">Product: -</div>
-          <div id="pprice">Price: -</div>
-          <div>Stock: <span id="pstock">-</span></div>
-        </div>
-
-        <input id="qty" type="number" value="1" min="1" />
-
-        <button onclick="buy()">Buy</button>
+      <div class="scan-actions">
+        <button onclick="startScan()">📷 Start Scan</button>
+        <button class="secondary-btn" onclick="stopScan()">⛔ Stop</button>
       </div>
 
-      <div id="admin" class="card page-section hidden">
-        <h2>Admin</h2>
-        <button onclick="load()">Refresh</button>
-        <button onclick="exportExcel()">Export Excel</button>
-        <button onclick="topSelling()">Top Selling</button>
-        <div id="report"></div>
+      <input id="barcode" placeholder="Scan or enter barcode">
+
+      <div class="info-box">
+        <div id="pname">Product: -</div>
+        <div id="pprice">Price: -</div>
+        <div>Stock: <span id="pstock">-</span></div>
       </div>
+
+      <input id="qty" type="number" value="1" min="1">
+      <button onclick="buy()">Buy</button>
     </div>
+
+    <div id="admin" class="card page-section hidden">
+      <h2>Admin</h2>
+      <button onclick="load()">Refresh</button>
+      <button onclick="exportExcel()">Export Excel</button>
+      <button onclick="topSelling()">Top Selling</button>
+      <div id="report"></div>
+    </div>
+
   </div>
+</div>
 
-  <script type="module">
-    import { BrowserMultiFormatReader } from "https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/+esm";
-    import {
-      BarcodeFormat,
-      DecodeHintType,
-      NotFoundException
-    } from "https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/+esm";
+<script type="module">
+import { BrowserMultiFormatReader } from "https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/+esm";
 
-    //////////////////////////////////////////////////
-    // CONFIG
-    //////////////////////////////////////////////////
+let URL = "https://script.google.com/macros/s/AKfycby6lyDIk9Gtdgk3hyIrDeWF3a5-PUdGw_UE98a2vFplhj6ln1RFY45gJYRVghCpQU0C/exec";
 
-    let URL = "https://script.google.com/macros/s/AKfycby6lyDIk9Gtdgk3hyIrDeWF3a5-PUdGw_UE98a2vFplhj6ln1RFY45gJYRVghCpQU0C/exec";
+let products = {};
+let sales = [];
+let codeReader = null;
 
-    let products = {};
-    let sales = [];
+const barcode = document.getElementById("barcode");
+const qty = document.getElementById("qty");
+const pname = document.getElementById("pname");
+const pprice = document.getElementById("pprice");
+const pstock = document.getElementById("pstock");
+const report = document.getElementById("report");
 
-    let codeReader = null;
-    let scannerControls = null;
-    let scannerRunning = false;
-    let lastScannedCode = "";
-    let lastScannedAt = 0;
-    const SCAN_COOLDOWN_MS = 1200;
+window.login = async function () {
+  if (user.value === "admin" && pass.value === "1234") {
+    adminBtn.style.display = "block";
+  } else if (user.value === "cashier" && pass.value === "1234") {
+    adminBtn.style.display = "none";
+  } else {
+    alert("Invalid login");
+    return;
+  }
 
-    //////////////////////////////////////////////////
-    // DOM
-    //////////////////////////////////////////////////
+  loginPage.classList.add("hidden");
+  app.classList.remove("hidden");
 
-    const barcode = document.getElementById("barcode");
-    const qty = document.getElementById("qty");
-    const pname = document.getElementById("pname");
-    const pprice = document.getElementById("pprice");
-    const pstock = document.getElementById("pstock");
-    const report = document.getElementById("report");
-    const adminBtn = document.getElementById("adminBtn");
-    const loginPage = document.getElementById("loginPage");
-    const app = document.getElementById("app");
-    const user = document.getElementById("user");
-    const pass = document.getElementById("pass");
-    const scanStatus = document.getElementById("scanStatus");
-    const scannerWrap = document.getElementById("scannerWrap");
-    const scannerPreview = document.getElementById("scannerPreview");
+  await load();
+  showPage("home");
+};
 
-    //////////////////////////////////////////////////
-    // LOGIN
-    //////////////////////////////////////////////////
+window.showPage = function(id){
+  document.querySelectorAll(".page-section").forEach(x=>x.classList.add("hidden"));
+  document.getElementById(id).classList.remove("hidden");
+};
 
-    window.login = async function () {
-      if (user.value === "admin" && pass.value === "1234") {
-        adminBtn.style.display = "block";
-      } else if (user.value === "cashier" && pass.value === "1234") {
-        adminBtn.style.display = "none";
-      } else {
-        alert("Invalid login");
-        return;
-      }
+async function load(){
+  const res = await fetch(URL);
+  const data = await res.json();
 
-      loginPage.classList.add("hidden");
-      app.classList.remove("hidden");
-
-      await load();
-      showPage("home");
+  products = {};
+  data.products.slice(1).forEach(r=>{
+    products[String(r[0]).trim()] = {
+      name:r[1],
+      srp:Number(r[2])||0,
+      margin:Number(r[3])||0,
+      stock:Number(r[4])||0
     };
+  });
 
-    //////////////////////////////////////////////////
-    // NAV
-    //////////////////////////////////////////////////
+  sales = data.sales || [];
+}
 
-    window.showPage = function (id) {
-      document.querySelectorAll(".page-section").forEach(section => {
-        section.classList.add("hidden");
-      });
-      document.getElementById(id).classList.remove("hidden");
-    };
+barcode.addEventListener("input", ()=>{
+  const p = products[barcode.value.trim()];
 
-    //////////////////////////////////////////////////
-    // LOAD DATA
-    //////////////////////////////////////////////////
+  if(p){
+    pname.innerText = "Product: "+p.name;
+    pprice.innerText = "Price: ₱"+p.srp.toFixed(2);
+    pstock.innerText = p.stock;
+  } else {
+    pname.innerText = "Product: NOT FOUND";
+    pprice.innerText = "Price: -";
+    pstock.innerText = "-";
+  }
+});
 
-    async function load() {
-      try {
-        const res = await fetch(URL);
-        const data = await res.json();
+window.buy = async function(){
 
-        products = {};
-        if (data.products && data.products.length > 1) {
-          data.products.slice(1).forEach(r => {
-            products[String(r[0]).trim()] = {
-              name: r[1],
-              srp: Number(r[2]),
-              margin: Number(r[3]),
-              stock: Number(r[4])
-            };
-          });
-        }
+  const code = barcode.value.trim();
+  const p = products[code];
+  const q = Number(qty.value);
 
-        sales = data.sales || [];
-      } catch (err) {
-        console.error(err);
-        alert("Failed to load data");
-      }
+  if(!p) return alert("Product not found");
+  if(!q || q<=0) return alert("Invalid qty");
+  if(p.stock < q) return alert("Not enough stock");
+
+  await fetch(URL,{
+    method:"POST",
+    headers:{"Content-Type":"text/plain;charset=utf-8"},
+    body:JSON.stringify({
+      barcode:code,
+      name:p.name,
+      qty:q,
+      total:p.srp*q,
+      profit:(p.margin||0)*q
+    })
+  });
+
+  alert("Saved");
+  barcode.value="";
+  qty.value=1;
+  await load();
+};
+
+window.exportExcel = function(){
+
+  if(!sales || sales.length<=1){
+    alert("No data");
+    return;
+  }
+
+  const data = sales.slice(1).map(s=>({
+    Date:s[0],
+    Product:s[1],
+    Qty:s[2],
+    Total:s[3],
+    Profit:s[4]
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Sales");
+  XLSX.writeFile(wb, "sales.xlsx");
+};
+
+window.topSelling = function(){
+
+  const map={};
+
+  sales.slice(1).forEach(s=>{
+    map[s[1]]=(map[s[1]]||0)+Number(s[2]);
+  });
+
+  report.innerHTML = Object.entries(map)
+    .sort((a,b)=>b[1]-a[1])
+    .map(x=>x[0]+" - "+x[1]+" pcs")
+    .join("<br>") || "No data";
+};
+
+window.startScan = async function(){
+  codeReader = new BrowserMultiFormatReader();
+  const devices = await BrowserMultiFormatReader.listVideoInputDevices();
+  const id = devices.find(d=>/back|rear/i.test(d.label))?.deviceId || devices[0].deviceId;
+
+  codeReader.decodeFromVideoDevice(id,"scannerPreview",(res)=>{
+    if(res){
+      barcode.value = res.getText();
+      barcode.dispatchEvent(new Event("input"));
+      stopScan();
     }
+  });
+};
 
-    //////////////////////////////////////////////////
-    // AUTO PRODUCT LOAD
-    //////////////////////////////////////////////////
+window.stopScan = function(){
+  if(codeReader) codeReader.reset();
+};
+</script>
 
-    barcode.addEventListener("input", () => {
-      const code = barcode.value.trim();
-      const p = products[code];
-
-      if (p) {
-        pname.innerText = "Product: " + p.name;
-        pprice.innerText = "Price: ₱" + p.srp.toFixed(2);
-        pstock.innerText = p.stock;
-      } else {
-        pname.innerText = "Product: NOT FOUND";
-        pprice.innerText = "Price: -";
-        pstock.innerText = "-";
-      }
-    });
-
-    //////////////////////////////////////////////////
-    // BUY
-    //////////////////////////////////////////////////
-
-    window.buy = async function () {
-      const code = barcode.value.trim();
-      const p = products[code];
-      const q = parseInt(qty.value, 10);
-
-      if (!p) {
-        alert("Product not found");
-        return;
-      }
-
-      if (!q || q <= 0) {
-        alert("Invalid quantity");
-        return;
-      }
-
-      if (p.stock < q) {
-        alert("Not enough stock");
-        return;
-      }
-
-      try {
-        const res = await fetch(URL, {
-          method: "POST",
-          headers: {
-            "Content-Type": "text/plain;charset=utf-8"
-          },
-          body: JSON.stringify({
-            barcode: code,
-            name: p.name,
-            qty: q,
-            total: p.srp * q,
-            profit: p.margin * q
-          })
-        });
-
-        alert(await res.text());
-
-        barcode.value = "";
-        qty.value = 1;
-        pname.innerText = "Product: -";
-        pprice.innerText = "Price: -";
-        pstock.innerText = "-";
-
-        await load();
-        barcode.focus();
-      } catch (err) {
-        console.error(err);
-        alert("Failed to save transaction");
-      }
-    };
-
-    //////////////////////////////////////////////////
-    // EXPORT
-    //////////////////////////////////////////////////
-
-    window.exportExcel = function () {
-      const formatted = (sales || []).slice(1).map(s => ({
-        Date: s[0],
-        Product: s[1],
-        Qty: s[2],
-        Total: s[3],
-        Profit: s[4]
-      }));
-
-      const ws = XLSX.utils.json_to_sheet(formatted);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Sales");
-      XLSX.writeFile(wb, "sales.xlsx");
-    };
-
-    //////////////////////////////////////////////////
-    // TOP SELLING
-    //////////////////////////////////////////////////
-
-    window.topSelling = function () {
-      const map = {};
-
-      (sales || []).slice(1).forEach(s => {
-        map[s[1]] = (map[s[1]] || 0) + Number(s[2]);
-      });
-
-      const html = Object.entries(map)
-        .sort((a, b) => b[1] - a[1])
-        .map(i => i[0] + " - " + i[1] + " pcs")
-        .join("<br>");
-
-      report.innerHTML = html || "No sales data";
-    };
-
-    //////////////////////////////////////////////////
-    // FAST ZXING SCANNER
-    //////////////////////////////////////////////////
-
-    function createHints() {
-      const hints = new Map();
-
-      // Keep only the most common retail formats for faster reading
-      hints.set(DecodeHintType.POSSIBLE_FORMATS, [
-        BarcodeFormat.EAN_13,
-        BarcodeFormat.UPC_A,
-        BarcodeFormat.CODE_128,
-        BarcodeFormat.EAN_8
-      ]);
-
-      hints.set(DecodeHintType.TRY_HARDER, true);
-      return hints;
-    }
-
-    async function getBestDeviceId() {
-      const devices = await BrowserMultiFormatReader.listVideoInputDevices();
-
-      if (!devices || !devices.length) {
-        throw new Error("No camera found");
-      }
-
-      const preferred = devices.find(d =>
-        /back|rear|environment|wide/i.test(d.label || "")
-      );
-
-      return (preferred || devices[0]).deviceId;
-    }
-
-    function fillBarcodeField(text) {
-      const clean = String(text || "").trim();
-      if (!clean) return;
-
-      barcode.value = clean;
-      barcode.dispatchEvent(new Event("input", { bubbles: true }));
-      scanStatus.innerText = "Scanned: " + clean;
-      barcode.focus();
-    }
-
-    async function applyFastCameraConstraints() {
-      const track = scannerPreview.srcObject &&
-                    scannerPreview.srcObject.getVideoTracks &&
-                    scannerPreview.srcObject.getVideoTracks()[0];
-
-      if (!track) return;
-
-      const capabilities = track.getCapabilities ? track.getCapabilities() : {};
-
-      const advanced = [];
-
-      if (capabilities.focusMode && capabilities.focusMode.includes("continuous")) {
-        advanced.push({ focusMode: "continuous" });
-      }
-
-      if (capabilities.exposureMode && capabilities.exposureMode.includes("continuous")) {
-        advanced.push({ exposureMode: "continuous" });
-      }
-
-      if (capabilities.whiteBalanceMode && capabilities.whiteBalanceMode.includes("continuous")) {
-        advanced.push({ whiteBalanceMode: "continuous" });
-      }
-
-      try {
-        await track.applyConstraints({
-          advanced
-        });
-      } catch (e) {
-        console.log("Constraint tuning skipped:", e);
-      }
-    }
-
-    window.startScan = async function () {
-      if (scannerRunning) return;
-
-      try {
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          alert("Camera API not available. Use HTTPS or a supported browser.");
-          return;
-        }
-
-        scanStatus.innerText = "Starting camera...";
-
-        const hints = createHints();
-        codeReader = new BrowserMultiFormatReader(hints, {
-          delayBetweenScanAttempts: 30,
-          delayBetweenScanSuccess: 500
-        });
-
-        const deviceId = await getBestDeviceId();
-
-        scannerRunning = true;
-
-        scannerControls = await codeReader.decodeFromConstraints(
-          {
-            audio: false,
-            video: {
-              deviceId: deviceId ? { exact: deviceId } : undefined,
-              facingMode: "environment",
-              width: { ideal: 1280 },
-              height: { ideal: 720 }
-            }
-          },
-          scannerPreview,
-          async (result, err) => {
-            if (result) {
-              const text = result.getText();
-              const now = Date.now();
-
-              if (
-                text &&
-                !(text === lastScannedCode && now - lastScannedAt < SCAN_COOLDOWN_MS)
-              ) {
-                lastScannedCode = text;
-                lastScannedAt = now;
-                fillBarcodeField(text);
-                await stopScan();
-              }
-              return;
-            }
-
-            if (err && !(err instanceof NotFoundException)) {
-              console.log("ZXing scan error:", err);
-            }
-          }
-        );
-
-        await applyFastCameraConstraints();
-        scanStatus.innerText = "Scanner running";
-      } catch (err) {
-        console.error(err);
-        scannerRunning = false;
-        scanStatus.innerText = "Camera error";
-        alert("Scanner failed: " + (err.message || err));
-      }
-    };
-
-    window.stopScan = async function () {
-      try {
-        if (scannerControls) {
-          scannerControls.stop();
-          scannerControls = null;
-        }
-
-        if (codeReader) {
-          codeReader.reset();
-          codeReader = null;
-        }
-
-        if (scannerPreview.srcObject) {
-          scannerPreview.srcObject.getTracks().forEach(track => track.stop());
-          scannerPreview.srcObject = null;
-        }
-      } catch (err) {
-        console.log(err);
-      }
-
-      scannerRunning = false;
-      scanStatus.innerText = "Scanner stopped";
-    };
-
-    //////////////////////////////////////////////////
-    // CLEANUP
-    //////////////////////////////////////////////////
-
-    document.addEventListener("visibilitychange", () => {
-      if (document.hidden && scannerRunning) {
-        stopScan();
-      }
-    });
-
-    window.addEventListener("beforeunload", () => {
-      if (scannerRunning) {
-        stopScan();
-      }
-    });
-  </script>
 </body>
 </html>
